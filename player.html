@@ -1,225 +1,276 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="referrer" content="origin" />
-<title>VSL</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 100%; height: 100%;
-    background: #000; overflow: hidden;
-    -webkit-tap-highlight-color: transparent;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-  .player {
-    position: relative;
-    width: 100%; height: 100vh;
-    background: #000;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  video {
-    width: 100%; height: 100%;
-    object-fit: contain;
-    display: block;
-    pointer-events: none;
-    background: #000;
-  }
+  <meta charset="UTF-8">
+  <title>VSL Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.ico">
 
-  /* overlay tap-to-unmute */
-  .overlay {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: rgba(0, 0, 0, 0.45);
-    color: #fff; text-align: center;
-    z-index: 10;
-    transition: opacity 0.4s ease, visibility 0.4s ease;
-  }
-  .overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      height: 100%;
+    }
 
-  .overlay-btn {
-    width: 96px; height: 96px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.18);
-    border: 3px solid #fff;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 22px;
-    animation: pulseRing 1.6s ease-out infinite;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-  .overlay-icon {
-    width: 42px; height: 42px;
-    fill: #fff;
-  }
-  .overlay-text {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
-    animation: blinkText 1.6s ease-in-out infinite;
-    padding: 0 16px;
-  }
-  .overlay-sub {
-    font-size: 13px;
-    font-weight: 500;
-    margin-top: 6px;
-    opacity: 0.85;
-    text-transform: none;
-    letter-spacing: 0.2px;
-  }
-  @keyframes pulseRing {
-    0%   { box-shadow: 0 0 0 0   rgba(255,255,255,0.55); transform: scale(1); }
-    70%  { box-shadow: 0 0 0 28px rgba(255,255,255,0);    transform: scale(1.04); }
-    100% { box-shadow: 0 0 0 0   rgba(255,255,255,0);    transform: scale(1); }
-  }
-  @keyframes blinkText {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.55; }
-  }
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-  /* fake progress bar (VTurb style — fast then slow) */
-  .progress {
-    position: absolute; left: 0; right: 0; bottom: 0;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.18);
-    z-index: 5;
-    pointer-events: none;
-  }
-  .progress-bar {
-    height: 100%; width: 0%;
-    background: #ff2d2d;
-    box-shadow: 0 0 8px rgba(255, 45, 45, 0.55);
-    transition: width 0.25s linear;
-  }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
 
-  /* loading spinner */
-  .loader {
-    position: absolute; top: 50%; left: 50%;
-    width: 44px; height: 44px;
-    margin: -22px 0 0 -22px;
-    border: 3px solid rgba(255,255,255,0.25);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin 0.9s linear infinite;
-    z-index: 8;
-  }
-  .loader.hidden { display: none; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
+    /* ===== Progress bar fake estilo vturb (VISIVEL) ===== */
+    .progress-wrap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 15px;
+      background: rgba(0,0,0,0.65);
+      border-top: 1px solid rgba(255,255,255,0.15);
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #FB7185;
+      transform-origin: left center;
+      transition: width 0.12s linear;
+    }
+
+    .unmute-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 10;
+    }
+
+    .unmute-overlay.hidden {
+      display: none;
+    }
+
+    .unmute-button {
+      background: #ffc800;
+      color: #000;
+      border-radius: 14px;
+      padding: 18px 32px;
+      font-family: Arial, sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      text-align: center;
+      cursor: pointer;
+      border: 2px solid #000;
+      display: inline-flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 1.2s infinite;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    .unmute-icon {
+      font-size: 34px;
+      margin-bottom: 4px;
+    }
+
+    .unmute-line-1 {
+      font-size: 15px;
+      letter-spacing: 0.5px;
+    }
+
+    .unmute-line-2 {
+      font-size: 14px;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 200, 0, 0.7);
+      }
+      70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 16px rgba(255, 200, 0, 0);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 200, 0, 0);
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="player" id="player">
-    <video id="video" muted playsinline autoplay preload="metadata" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
 
-    <div class="loader hidden" id="loader"></div>
+<div class="video-wrapper">
+  <video id="video" autoplay muted playsinline></video>
 
-    <div class="overlay" id="overlay">
-      <div class="overlay-btn">
-        <svg class="overlay-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06a9 9 0 0 0 0-17.54z"/>
-        </svg>
-      </div>
-      <div class="overlay-text">Haz clic para escuchar</div>
-      <div class="overlay-sub">Tu video ya comenzó</div>
-    </div>
-
-    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <!-- barra de progresso fake -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar" id="progressBar"></div>
   </div>
 
+  <div class="unmute-overlay" id="unmuteOverlay">
+    <div class="unmute-button">
+      <div class="unmute-icon">&#128263;</div>
+      <span class="unmute-line-1">&iexcl;TU VIDEO YA COMENZ&Oacute;!</span>
+      <span class="unmute-line-2">&iexcl;HAS CLIC PARA ESCUCHAR!</span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-(function () {
-  const params  = new URLSearchParams(window.location.search);
-  const raw     = params.get('v') || 'vsl_001';
-  const vid     = raw.replace(/[^a-zA-Z0-9_-]/g, '');
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('unmuteOverlay');
+  const btn     = overlay.querySelector('.unmute-button');
+  const icon    = overlay.querySelector('.unmute-icon');
+  const line1   = overlay.querySelector('.unmute-line-1');
+  const line2   = overlay.querySelector('.unmute-line-2');
 
-  const video    = document.getElementById('video');
-  const overlay  = document.getElementById('overlay');
-  const player   = document.getElementById('player');
-  const progress = document.getElementById('progressBar');
-  const loader   = document.getElementById('loader');
+  const progressBar  = document.getElementById('progressBar');
+  const progressWrap = document.getElementById('progressWrap');
 
-  video.src = 'videos/' + vid + '.mp4';
-  video.load();
+  // pega ?v=vsl_001, ?v=vsl_002, etc
+  const params = new URLSearchParams(window.location.search);
+  const requestedId = params.get('v');
 
-  const tryPlay = () => video.play().catch(() => {});
-  tryPlay();
+  const allowed = ['vsl_001', 'vsl_002', 'vsl_003', 'vsl_004'];
 
-  // tap-to-unmute on entire player area
-  // pause -> unmute -> play() must run synchronously in user-gesture stack
-  // so iOS/Chrome mobile registers audio playback as user-initiated.
-  let unmuted = false;
-  function unmute() {
-    if (unmuted) return;
-    unmuted = true;
-    const t = video.currentTime;
-    video.pause();
-    video.muted = false;
-    video.volume = 1;
-    video.currentTime = t;
-    overlay.classList.add('hidden');
-    const p = video.play();
-    if (p && typeof p.catch === 'function') p.catch(() => {});
-  }
-  player.addEventListener('click', unmute);
-  player.addEventListener('touchstart', unmute, { passive: true });
+  // ===== Config da barra fake =====
+  let THRESH = 0.8;
 
-  // ---- Defesa contra pause externo ----
-  // O player nao tem controles visiveis pro usuario (video tem pointer-events:none,
-  // controls=false). Logo qualquer pause apos o unmute e externo (ex: Inlead, parent
-  // page, scroll handler, etc). Auto-resume.
-  video.addEventListener('pause', () => {
-    if (unmuted && !video.ended) {
-      const p = video.play();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
+  function updateFakeThreshold() {
+    const dur = video.duration;
+    if (!dur || !isFinite(dur) || dur <= 0) return;
+
+    let fakeDur;
+    if (dur <= 120) {
+      fakeDur = dur;
+    } else if (dur <= 300) {
+      fakeDur = 120;
+    } else {
+      fakeDur = dur * 0.40;
     }
-  });
 
-  // Watchdog: se algo pausa sem disparar o evento (re-mount de iframe, throttling,
-  // visibility tricks), checa a cada 500ms e retoma.
-  setInterval(() => {
-    if (unmuted && video.paused && !video.ended) {
+    THRESH = fakeDur / dur;
+    THRESH = Math.min(Math.max(THRESH, 0.2), 0.9);
+  }
+
+  function fakeProgress(real) {
+    if (real <= 0) return 0;
+    if (THRESH >= 0.999) return real;
+    const TARGET = 0.97;
+    if (real < THRESH) {
+      return (real / THRESH) * TARGET;
+    }
+    const tailReal = (real - THRESH) / (1 - THRESH);
+    return TARGET + (tailReal * (1 - TARGET));
+  }
+
+  let rafId = null;
+  function startProgressLoop() {
+    if (rafId) cancelAnimationFrame(rafId);
+    const tick = () => {
+      const dur = video.duration;
+      const cur = video.currentTime;
+      if (dur && isFinite(dur) && dur > 0) {
+        const real = Math.min(cur / dur, 1);
+        const fake = fakeProgress(real);
+        progressBar.style.width = (fake * 100).toFixed(3) + '%';
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function resetProgress() {
+    progressBar.style.width = '0%';
+  }
+
+  if (!requestedId || !allowed.includes(requestedId)) {
+    if (icon)  icon.textContent  = '⚠️';
+    if (line1) line1.textContent = 'VIDEO NO ENCONTRADO';
+    if (line2) line2.textContent = 'Revise el enlace o ID vsl_00X';
+
+    btn.style.cursor = 'default';
+    btn.onclick = null;
+    overlay.classList.remove('hidden');
+
+    video.style.display = 'none';
+    progressWrap.style.display = 'none';
+  } else {
+    const videoId = requestedId;
+    const src = videoId + '/index.m3u8';
+
+    let hls = null;
+
+    if (Hls.isSupported()) {
+      hls = new Hls();
+      hls.loadSource(src);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        updateFakeThreshold();
+        startProgressLoop();
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src;
+    }
+
+    video.muted = true;
+    video.play().catch(() => {});
+
+    video.addEventListener('loadedmetadata', () => {
+      updateFakeThreshold();
+      startProgressLoop();
+    });
+
+    video.addEventListener('play', startProgressLoop);
+
+    function restartAndUnmute() {
+      try { video.pause(); } catch (e) {}
+      try { video.currentTime = 0; } catch (e) {}
+
+      resetProgress();
+
+      video.muted = false;
+      video.volume = 1;
       video.play().catch(() => {});
+      overlay.classList.add('hidden');
+
+      updateFakeThreshold();
     }
-  }, 500);
 
-  // loading indicator
-  video.addEventListener('waiting',  () => loader.classList.remove('hidden'));
-  video.addEventListener('playing',  () => loader.classList.add('hidden'));
-  video.addEventListener('canplay',  () => loader.classList.add('hidden'));
-
-  // VTurb-style fake progress bar — fast start, slow tail
-  function fakeMap(realPct) {
-    if (realPct <= 0)  return 0;
-    if (realPct >= 1)  return 100;
-    if (realPct < 0.10) return (realPct / 0.10) * 38;
-    if (realPct < 0.30) return 38 + ((realPct - 0.10) / 0.20) * 24;
-    if (realPct < 0.70) return 62 + ((realPct - 0.30) / 0.40) * 26;
-    return 88 + ((realPct - 0.70) / 0.30) * 12;
+    overlay.addEventListener('click', () => {
+      if (video.readyState >= 1) {
+        restartAndUnmute();
+      } else {
+        const onLoaded = () => {
+          video.removeEventListener('loadedmetadata', onLoaded);
+          restartAndUnmute();
+        };
+        video.addEventListener('loadedmetadata', onLoaded);
+      }
+    });
   }
-
-  function tick() {
-    const d = video.duration;
-    if (!d || isNaN(d) || d <= 0) return;
-    const pct = Math.min(1, video.currentTime / d);
-    progress.style.width = fakeMap(pct).toFixed(2) + '%';
-  }
-  setInterval(tick, 250);
-
-  // hide native controls / disable context menu
-  video.controls = false;
-  video.addEventListener('contextmenu', e => e.preventDefault());
-
-  // keep playing on visibility regain (mobile tab switch)
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) tryPlay();
-  });
-})();
 </script>
+
 </body>
 </html>
