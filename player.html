@@ -151,14 +151,22 @@
   tryPlay();
 
   // tap-to-unmute on entire player area
+  // IMPORTANT: pause -> unmute -> play() must run synchronously inside the
+  // user-gesture handler. Browsers (especially iOS Safari and Chrome mobile)
+  // pause audio playback ~1s after the toggle if the play() call did not
+  // originate from a user gesture stack frame.
   let unmuted = false;
   function unmute() {
     if (unmuted) return;
     unmuted = true;
+    const t = video.currentTime;
+    video.pause();
     video.muted = false;
     video.volume = 1;
+    video.currentTime = t;
     overlay.classList.add('hidden');
-    tryPlay();
+    const p = video.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
   }
   player.addEventListener('click', unmute);
   player.addEventListener('touchstart', unmute, { passive: true });
