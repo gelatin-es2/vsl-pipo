@@ -115,7 +115,7 @@
 </head>
 <body>
   <div class="player" id="player">
-    <video id="video" muted playsinline autoplay preload="auto" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
+    <video id="video" muted playsinline autoplay preload="metadata" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
 
     <div class="loader hidden" id="loader"></div>
 
@@ -151,10 +151,8 @@
   tryPlay();
 
   // tap-to-unmute on entire player area
-  // IMPORTANT: pause -> unmute -> play() must run synchronously inside the
-  // user-gesture handler. Browsers (especially iOS Safari and Chrome mobile)
-  // pause audio playback ~1s after the toggle if the play() call did not
-  // originate from a user gesture stack frame.
+  // pause -> unmute -> play() must run synchronously in user-gesture stack
+  // so iOS/Chrome mobile registers audio playback as user-initiated.
   let unmuted = false;
   function unmute() {
     if (unmuted) return;
@@ -171,20 +169,38 @@
   player.addEventListener('click', unmute);
   player.addEventListener('touchstart', unmute, { passive: true });
 
+  // ---- Defesa contra pause externo ----
+  // O player nao tem controles visiveis pro usuario (video tem pointer-events:none,
+  // controls=false). Logo qualquer pause apos o unmute e externo (ex: Inlead, parent
+  // page, scroll handler, etc). Auto-resume.
+  video.addEventListener('pause', () => {
+    if (unmuted && !video.ended) {
+      const p = video.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+  });
+
+  // Watchdog: se algo pausa sem disparar o evento (re-mount de iframe, throttling,
+  // visibility tricks), checa a cada 500ms e retoma.
+  setInterval(() => {
+    if (unmuted && video.paused && !video.ended) {
+      video.play().catch(() => {});
+    }
+  }, 500);
+
   // loading indicator
   video.addEventListener('waiting',  () => loader.classList.remove('hidden'));
   video.addEventListener('playing',  () => loader.classList.add('hidden'));
   video.addEventListener('canplay',  () => loader.classList.add('hidden'));
 
   // VTurb-style fake progress bar — fast start, slow tail
-  // segments map elapsed % of REAL duration -> displayed % on the bar
   function fakeMap(realPct) {
     if (realPct <= 0)  return 0;
     if (realPct >= 1)  return 100;
-    if (realPct < 0.10) return (realPct / 0.10) * 38;          //  0..10%  ->  0..38%
-    if (realPct < 0.30) return 38 + ((realPct - 0.10) / 0.20) * 24; // 10..30% -> 38..62%
-    if (realPct < 0.70) return 62 + ((realPct - 0.30) / 0.40) * 26; // 30..70% -> 62..88%
-    return 88 + ((realPct - 0.70) / 0.30) * 12;                // 70..100% -> 88..100%
+    if (realPct < 0.10) return (realPct / 0.10) * 38;
+    if (realPct < 0.30) return 38 + ((realPct - 0.10) / 0.20) * 24;
+    if (realPct < 0.70) return 62 + ((realPct - 0.30) / 0.40) * 26;
+    return 88 + ((realPct - 0.70) / 0.30) * 12;
   }
 
   function tick() {
